@@ -1,0 +1,130 @@
+# Case Study 13: ATM Transaction Sequence Simulation
+
+## Problem Statement
+Process a sequence of deposits and withdrawals, maintain a simulated balance, enforce withdrawal limits, reject invalid transactions, and produce a transaction summary.
+
+## Objectives
+- Process sequential `"DEPOSIT"` and `"WITHDRAW"` transactions while tracking running balance.
+- Enforce positive amount checks, sufficient-balance rules, per-transaction withdrawal caps, and daily withdrawal limits.
+- Record all approved and rejected attempts in an audit log and print an end-of-session summary.
+
+## Assumptions
+- Opening balance is Rs. 10,000.00.
+- Per-transaction withdrawal limit is Rs. 15,000.00 and daily cumulative withdrawal limit is Rs. 25,000.00.
+- Transaction amounts $\le 0$ or unrecognized transaction types are rejected without modifying the balance.
+
+## Algorithm
+1. Initialize `balance`, `daily_withdrawn = 0.0`, `total_deposited = 0.0`, `approved = 0`, `rejected = 0`, and `audit_log = []`.
+2. Loop through each `(txn_type, amount)` tuple in the transaction list.
+3. Normalize `txn_type` using string methods (`strip()` and `upper()`) and verify `amount > 0`.
+4. If `"DEPOSIT"`, add `amount` to `balance` and `total_deposited`, increment `approved`, and append an `"APPROVED"` tuple to `audit_log`.
+5. If `"WITHDRAW"`, check `amount <= per_txn_limit`, `daily_withdrawn + amount <= daily_limit`, and `amount <= balance`; update state if valid, otherwise append a `"REJECTED"` tuple with the specific failure reason.
+6. Return `audit_log` and a summary tuple, then print the formatted report.
+
+## Flowchart
+```text
+[Start]
+   |
+   v
+[Initialize balance, limits, counters & log list]
+   |
+   v
+[For each (txn_type, amount) in sequence]
+   |
+   +--> (amount <= 0?) --Yes--> [Log REJECTED: non-positive amount]
+   |         |
+   |         No
+   +--> (txn_type == "DEPOSIT"?) --Yes--> [Update balance, log APPROVED]
+   |         |
+   |         No
+   +--> (txn_type == "WITHDRAW"?)
+             |--(violates limit or balance?)--> [Log REJECTED with reason]
+             |--(valid)-----------------------> [Deduct balance, update daily_withdrawn, log APPROVED]
+   |
+   v
+[Print audit log & summary tuple]
+   |
+   v
+[Stop]
+```
+
+## Pseudocode
+```text
+BEGIN
+    balance = 10000.0
+    per_txn_limit = 15000.0
+    daily_limit = 25000.0
+    daily_withdrawn = 0.0
+    total_deposited = 0.0
+    approved = 0
+    rejected = 0
+    audit_log = []
+
+    FOR each (raw_type, amt) IN transactions DO
+        kind = UPPER(TRIM(raw_type))
+        IF amt <= 0 THEN
+            rejected = rejected + 1
+            APPEND ("REJECTED", kind, amt, "Amount must be greater than zero", balance) TO audit_log
+        ELSE IF kind == "DEPOSIT" THEN
+            balance = balance + amt
+            total_deposited = total_deposited + amt
+            approved = approved + 1
+            APPEND ("APPROVED", kind, amt, "Deposit credited", balance) TO audit_log
+        ELSE IF kind == "WITHDRAW" THEN
+            IF amt > per_txn_limit THEN
+                rejected = rejected + 1
+                APPEND ("REJECTED", kind, amt, "Exceeds per-txn limit", balance) TO audit_log
+            ELSE IF (daily_withdrawn + amt) > daily_limit THEN
+                rejected = rejected + 1
+                APPEND ("REJECTED", kind, amt, "Exceeds daily limit", balance) TO audit_log
+            ELSE IF amt > balance THEN
+                rejected = rejected + 1
+                APPEND ("REJECTED", kind, amt, "Insufficient funds", balance) TO audit_log
+            ELSE
+                balance = balance - amt
+                daily_withdrawn = daily_withdrawn + amt
+                approved = approved + 1
+                APPEND ("APPROVED", kind, amt, "Withdrawal dispensed", balance) TO audit_log
+            END IF
+        ELSE
+            rejected = rejected + 1
+            APPEND ("REJECTED", kind, amt, "Unsupported transaction type", balance) TO audit_log
+        END IF
+    END FOR
+
+    PRINT audit_log and summary
+END
+```
+
+
+
+## Test Cases
+| Test Case | Transaction Input | Expected Status & Balance |
+| :--- | :--- | :--- |
+| TC-1 (Valid deposit) | `("deposit", 5000.0)` | `APPROVED` $\rightarrow$ Balance `Rs. 15000.00` |
+| TC-2 (Per-txn cap) | `("withdraw", 18000.0)` | `REJECTED` (Exceeds Rs. 15,000 limit) $\rightarrow$ Balance `Rs. 15000.00` |
+| TC-3 (Valid withdrawal) | `("withdraw", 12000.0)` | `APPROVED` $\rightarrow$ Balance `Rs. 3000.00`, Daily withdrawn `Rs. 12000.00` |
+| TC-4 (Daily cap) | `("withdraw", 14000.0)` | `REJECTED` (`12000 + 14000 > 25000`) $\rightarrow$ Balance `Rs. 3000.00` |
+| TC-5 (Insufficient funds) | `("withdraw", 5000.0)` | `REJECTED` (`5000 > 3000`) $\rightarrow$ Balance `Rs. 3000.00` |
+| TC-6 (Invalid amount) | `("withdraw", -100.0)` | `REJECTED` (Non-positive amount) $\rightarrow$ Balance `Rs. 3000.00` |
+
+## Sample Output
+```text
+=== ATM Transaction Log ===
+[APPROVED] DEPOSIT  Rs.5000.00  | Bal: Rs.15000.00 | Deposit credited
+[REJECTED] WITHDRAW Rs.18000.00 | Bal: Rs.15000.00 | Exceeds per-txn limit (15000.00)
+[APPROVED] WITHDRAW Rs.12000.00 | Bal: Rs.3000.00  | Withdrawal dispensed
+[REJECTED] WITHDRAW Rs.14000.00 | Bal: Rs.3000.00  | Exceeds daily limit (25000.00)
+[REJECTED] WITHDRAW Rs.5000.00  | Bal: Rs.3000.00  | Insufficient funds
+[REJECTED] WITHDRAW Rs.-100.00  | Bal: Rs.3000.00  | Amount must be greater than zero
+
+=== Session Summary ===
+Opening Balance     : Rs. 10000.00
+Closing Balance     : Rs. 3000.00
+Total Deposited     : Rs. 5000.00
+Total Withdrawn     : Rs. 12000.00
+Approved / Rejected : 2 / 4
+```
+
+## Conclusion
+Guarding account state transitions with ordered conditional checks ensures invalid transactions are safely rejected while maintaining an exact audit log using lists and tuples.
